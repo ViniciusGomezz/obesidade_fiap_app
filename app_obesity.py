@@ -488,7 +488,7 @@ else:
 """)
 
     st.markdown("""
-### Desempenho (seu notebook)
+### Desempenho
 
 <ul style="color:#1E1E1E;">
   <li><b>Accuracy teste:</b> 0.976</li>
@@ -500,8 +500,7 @@ st.markdown("""
 **Boas práticas:**
 - O sistema é suporte à decisão e não substitui avaliação médica.
 - Recomenda-se monitorar drift e revalidar o modelo periodicamente.
-""")
-st.markdown("""
+
 ### Estratégia de Modelagem
 
 O modelo foi desenvolvido utilizando uma pipeline completa de Machine Learning, incluindo:
