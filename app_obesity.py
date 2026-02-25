@@ -496,15 +496,13 @@ else:
 </ul>
 """, unsafe_allow_html=True)
 
-st.markdown("""
+    st.markdown("""
 **Boas práticas:**
 - O sistema é suporte à decisão e não substitui avaliação médica.
 - Recomenda-se monitorar drift e revalidar o modelo periodicamente.
 
 ### Estratégia de Modelagem
-
 O modelo foi desenvolvido utilizando uma pipeline completa de Machine Learning, incluindo:
-
 - Tratamento de valores ausentes
 - Padronização de variáveis numéricas
 - Codificação de variáveis categóricas
@@ -512,17 +510,14 @@ O modelo foi desenvolvido utilizando uma pipeline completa de Machine Learning, 
 - Classificador RandomForest
 
 ### Justificativa da Escolha do Modelo
-
 O RandomForest foi escolhido por sua robustez para dados tabulares, capacidade de capturar relações não lineares e bom desempenho em problemas multiclasse.
 
 ### Validação
-
 - Validação cruzada (5-fold): 98,5% de acurácia média
 - Teste holdout: 97,6% de acurácia
 
 A baixa diferença entre validação e teste indica boa capacidade de generalização.
 
 ### Considerações
-
 O sistema atua como apoio à decisão clínica e não substitui avaliação médica especializada.
 """)
