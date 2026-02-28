@@ -3,10 +3,47 @@ import pandas as pd
 import numpy as np
 import joblib
 import plotly.express as px
+import plotly.graph_objects as go
 
-# =========================
-# CONFIG
-# =========================
+def apply_dark_style(fig):
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="#0E1117",
+        plot_bgcolor="#0E1117",
+        font=dict(color="white"),
+        margin=dict(l=40, r=20, t=60, b=40),
+        legend=dict(font=dict(color="white")),
+    )
+
+    # empilhado quando necessário
+    if stacked:
+        fig.update_layout(barmode="stack")
+
+    # remover contorno/linha em séries (o "azul" chato)
+    fig.update_traces(marker_line_width=0, marker_line_color="rgba(0,0,0,0)")
+
+    # eixos com grid sutil
+    fig.update_xaxes(type="category", showgrid=False)
+    fig.update_yaxes(showgrid=True, gridcolor="rgba(255,255,255,0.08)")
+
+    return fig
+
+
+GRAPH_H = 420  # altura padrão dos gráficos
+
+def apply_dark_style(fig):
+    fig.update_layout(
+        height=GRAPH_H,
+        paper_bgcolor="#0E1117",
+        plot_bgcolor="#0E1117",
+        font=dict(color="white"),
+        margin=dict(l=20, r=20, t=50, b=40),
+    )
+    # remove contorno “azul” / borda nas barras e caixas
+    fig.update_traces(marker_line_width=0)
+    return fig
+
+
 st.set_page_config(
     page_title="Sistema de Predição de Obesidade",
     page_icon="🏥",
@@ -65,12 +102,21 @@ div[data-testid="stForm"] {
     box-shadow: 0px 3px 10px rgba(0,0,0,0.08);
 }
 
+
 /* Métricas */
 [data-testid="stMetric"] {
     background-color: white;
     padding: 15px;
     border-radius: 10px;
     box-shadow: 0px 2px 6px rgba(0,0,0,0.08);
+}
+
+/* ===== Forçar texto das métricas para preto ===== */
+div[data-testid="stMetric"] [data-testid="stMetricLabel"],
+div[data-testid="stMetric"] [data-testid="stMetricValue"],
+div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
+    color: #1E1E1E !important;
+    opacity: 1 !important;
 }
 
 /* Botão normal (fora do form) */
@@ -186,7 +232,7 @@ def obesity_group(label: str) -> str:
 # UI - HEADER
 # =========================
 st.title("🏥 Sistema de Apoio à Decisão: Predição de Obesidade")
-st.caption("Modelo de Machine Learning (RandomForest + BMI) para auxiliar triagem e priorização clínica. Não substitui diagnóstico médico.")
+st.caption("Modelo de Machine Learning (RandomForest + IMC) para auxiliar triagem e priorização clínica. Não substitui diagnóstico médico. Criado por Vinicius Paixão Gomes")
 
 # sidebar navigation
 page = st.sidebar.radio(
@@ -208,108 +254,125 @@ if page == "📌 Predição (Triagem)":
     with st.form("triagem_form"):
 
         st.markdown("### 👤 Informações Básicas")
-    
+
         c1, c2 = st.columns(2)
-    
+
         with c1:
             Gender = st.selectbox(
                 "Gênero",
                 sorted(df["Gender"].dropna().unique().tolist())
             )
-    
+
             Age = st.number_input(
-                "Idade",
-                min_value=1, max_value=120, value=30
+                "Idade (anos)",
+                min_value=14, max_value=61, value=30, step=1
             )
-    
+
             Height = st.number_input(
-                "Altura (em metros)",
-                min_value=1.0, max_value=2.5, value=1.70, step=0.01
+                "Altura (m)",
+                min_value=1.45, max_value=1.98, value=1.70, step=0.01
             )
-    
+
             Weight = st.number_input(
-                "Peso (em kg)",
-                min_value=20.0, max_value=300.0, value=75.0, step=0.5
+                "Peso (kg)",
+                min_value=39.0, max_value=173.0, value=75.0, step=0.5
             )
-    
+
         with c2:
             family_history = st.selectbox(
                 "Algum membro da família sofreu ou sofre de excesso de peso?",
                 sorted(df["family_history"].dropna().unique().tolist())
             )
-    
+
             SMOKE = st.selectbox(
                 "Você fuma?",
                 sorted(df["SMOKE"].dropna().unique().tolist())
             )
-    
+
             MTRANS = st.selectbox(
                 "Qual meio de transporte você costuma usar?",
                 sorted(df["MTRANS"].dropna().unique().tolist())
             )
-    
+
         st.markdown("### 🍎 Hábitos Alimentares")
-    
+
         c3, c4 = st.columns(2)
-    
+
         with c3:
             FAVC = st.selectbox(
                 "Você come alimentos altamente calóricos com frequência?",
                 sorted(df["FAVC"].dropna().unique().tolist())
             )
-    
-            FCVC = st.number_input(
-                "Você costuma comer vegetais nas suas refeições? (0 a 3)",
-                min_value=0.0, max_value=3.0, value=2.0, step=0.1
+
+            fcvc_label = st.selectbox(
+                "Frequência de consumo de vegetais (FCVC)",
+                ["1 - Raramente", "2 - Às vezes", "3 - Sempre"],
+                index=1
             )
-    
-            NCP = st.number_input(
-                "Quantas refeições principais você faz diariamente?",
-                min_value=0.0, max_value=5.0, value=3.0, step=0.1
+            FCVC = int(fcvc_label[0])
+
+            ncp_label = st.selectbox(
+                "Quantas refeições principais você faz diariamente? (NCP)",
+                ["1 - Uma", "2 - Duas", "3 - Três", "4 - Quatro ou mais"],
+                index=2
             )
-    
+            NCP = int(ncp_label[0])
+
         with c4:
             CAEC = st.selectbox(
                 "Você come alguma coisa entre as refeições?",
                 sorted(df["CAEC"].dropna().unique().tolist())
             )
-    
+
             SCC = st.selectbox(
                 "Você monitora as calorias que ingere diariamente?",
                 sorted(df["SCC"].dropna().unique().tolist())
             )
-    
-            CH2O = st.number_input(
-                "Quanta água você bebe diariamente? (0 a 5)",
-                min_value=0.0, max_value=5.0, value=2.0, step=0.1
+
+            ch2o_label = st.selectbox(
+                "Consumo diário de água (CH2O)",
+                ["1 - < 1 L/dia", "2 - 1–2 L/dia", "3 - > 2 L/dia"],
+                index=1
             )
-    
+            CH2O = int(ch2o_label[0])
+
         st.markdown("### 🏃 Estilo de Vida")
-    
+
         c5, c6 = st.columns(2)
-    
+
         with c5:
-            FAF = st.number_input(
-                "Com que frequência você pratica atividade física? (0 a 3)",
-                min_value=0.0, max_value=3.0, value=1.0, step=0.1
+            faf_label = st.selectbox(
+                "Frequência semanal de atividade física (FAF)",
+                ["0 - Nenhuma", "1 - 1–2x/sem", "2 - 3–4x/sem", "3 - 5x/sem ou mais"],
+                index=1
             )
-    
+            FAF = int(faf_label[0])
+
         with c6:
-            TUE = st.number_input(
-                "Quanto tempo você usa dispositivos tecnológicos diariamente? (0 a 3)",
-                min_value=0.0, max_value=3.0, value=1.0, step=0.1
+            tue_label = st.selectbox(
+                "Tempo diário usando dispositivos eletrônicos (TUE)",
+                ["0 - 0–2 h/dia", "1 - 3–5 h/dia", "2 - > 5 h/dia"],
+                index=1
             )
-    
+            TUE = int(tue_label[0])
+
             CALC = st.selectbox(
                 "Com que frequência você bebe álcool?",
                 sorted(df["CALC"].dropna().unique().tolist())
             )
-    
+
         submitted = st.form_submit_button("🔎 Analisar risco de obesidade")
-    
+
         if submitted:
             bmi = Weight / (Height ** 2)
-    
+
+            # (segurança extra: garante domínio inteiro)
+            FCVC = int(FCVC)
+            NCP = int(NCP)
+            CH2O = int(CH2O)
+            FAF = int(FAF)
+            TUE = int(TUE)
+
             # montar input exatamente com colunas do treino + BMI
             row = {
                 "Gender": Gender,
@@ -331,22 +394,25 @@ if page == "📌 Predição (Triagem)":
                 "BMI": bmi,
             }
             X_input = pd.DataFrame([row])
-    
+
             pred = model.predict(X_input)[0]
             group = obesity_group(pred)
-    
+
             # Probabilidades (se o modelo suportar)
             proba = None
             if hasattr(model, "predict_proba"):
                 proba = model.predict_proba(X_input)[0]
                 classes = model.classes_
-                proba_df = pd.DataFrame({"classe": classes, "probabilidade": proba}).sort_values("probabilidade", ascending=False)
-    
+                proba_df = (
+                    pd.DataFrame({"classe": classes, "probabilidade": proba})
+                    .sort_values("probabilidade", ascending=False)
+                )
+
             k1, k2, k3 = st.columns(3)
             k1.metric("Resultado previsto", pred)
             k2.metric("Categoria clínica", group)
             k3.metric("BMI (IMC)", f"{bmi:.2f}")
-    
+
             if group == "Obesidade":
                 st.error("⚠️ Perfil de maior risco. Recomenda-se avaliação clínica e plano de intervenção.")
             elif group == "Sobrepeso":
@@ -355,7 +421,7 @@ if page == "📌 Predição (Triagem)":
                 st.info("ℹ️ Perfil abaixo do peso. Avaliar risco nutricional.")
             else:
                 st.success("✅ Perfil dentro do esperado para peso normal.")
-    
+
             if proba is not None:
                 st.markdown("### Probabilidade por classe")
                 fig = px.bar(proba_df.head(7), x="classe", y="probabilidade")
@@ -399,62 +465,108 @@ elif page == "📊 Dashboard (Insights)":
     k1.metric("Total (filtro)", f"{total}")
     k2.metric("% Obesidade", f"{pct_obes:.1f}%")
     k3.metric("% Sobrepeso", f"{pct_sobre:.1f}%")
-    k4.metric("BMI médio", f"{bmi_mean:.2f}")
-    k5.metric("Idade média", f"{age_mean:.1f}")
+    k4.metric("IMC médio", f"{bmi_mean:.2f}")
+    k5.metric("Média de Idade", f"{age_mean:.1f}")
 
     st.divider()
 
     # Gráficos
-    c1, c2 = st.columns(2)
 
+    c1, c2 = st.columns(2)
+    
     with c1:
         dist = dff[TARGET_COL].value_counts().reset_index()
         dist.columns = ["classe", "contagem"]
         fig = px.bar(dist, x="classe", y="contagem", title="Distribuição dos níveis de obesidade")
+        fig = apply_dark_style(fig)
         st.plotly_chart(fig, use_container_width=True)
-
+    
     with c2:
         by_gender = (
             dff.groupby(["Gender", TARGET_COL])
-              .size()
-              .reset_index(name="contagem")
+               .size()
+               .reset_index(name="contagem")
         )
-        fig = px.bar(by_gender, x="Gender", y="contagem", color=TARGET_COL,
-                     title="Distribuição por gênero x nível")
+    
+        # Stacked de verdade (go.Figure)
+        fig = go.Figure()
+        for cls in by_gender[TARGET_COL].unique():
+            tmp = by_gender[by_gender[TARGET_COL] == cls]
+            fig.add_trace(go.Bar(x=tmp["Gender"], y=tmp["contagem"], name=str(cls)))
+    
+        fig.update_layout(
+            barmode="stack",
+            title="Distribuição por gênero x nível",
+            xaxis_title="Gender",
+            yaxis_title="contagem",
+            legend_title_text="Obesity",
+        )
+        fig = apply_dark_style(fig)
+                           
+        fig.update_traces(marker_line_width=0)
+        
+        fig.update_traces(
+            hovertemplate="Gênero: %{x}<br>Nível: %{fullData.name}<br>Contagem: %{y}<extra></extra>"
+        )
+        fig.update_layout(
+            hoverlabel=dict(namelength=-1)
+        )
+        
         st.plotly_chart(fig, use_container_width=True)
-
+    
     c3, c4 = st.columns(2)
-
+    
     with c3:
         fig = px.box(dff, x=TARGET_COL, y="Age", title="Idade por nível de obesidade")
+        fig = apply_dark_style(fig)
         st.plotly_chart(fig, use_container_width=True)
-
+    
     with c4:
-        fig = px.box(dff, x=TARGET_COL, y="BMI", title="BMI (IMC) por nível de obesidade")
+        fig = px.box(dff, x=TARGET_COL, y="BMI", title="IMC por nível de obesidade")
+        fig = apply_dark_style(fig)
         st.plotly_chart(fig, use_container_width=True)
-
-    st.divider()
-    st.markdown("### Hábitos e estilo de vida (associação com obesidade)")
+            
+        st.divider()
+        st.markdown("### Hábitos e estilo de vida (associação com obesidade)")
 
     c5, c6, c7 = st.columns(3)
 
     with c5:
-        favc = pd.crosstab(dff[TARGET_COL], dff["FAVC"], normalize="index").reset_index()
-        fig = px.bar(favc, x=TARGET_COL, y=favc.columns[1:], barmode="stack",
-                     title="FAVC (alimentos calóricos) por nível")
+        favc = pd.crosstab(dff[TARGET_COL], dff["FAVC"], normalize="index")
+        favc = favc.reindex(sorted(favc.index), axis=0)
+    
+        fig = go.Figure()
+        for col in favc.columns:
+            fig.add_trace(go.Bar(
+                x=favc.index.astype(str),
+                y=favc[col],
+                name=str(col),
+            ))
+    
+        fig.update_layout(
+            barmode="stack",
+            title="FAVC (alimentos calóricos) por nível",
+            xaxis=dict(title=TARGET_COL, type="category"),
+            yaxis=dict(title="proporção", tickformat=".0%", gridcolor="rgba(255,255,255,0.08)"),
+            legend_title_text="FAVC",
+        )
+    
+        fig = apply_dark_style(fig)
         st.plotly_chart(fig, use_container_width=True)
-
+    
     with c6:
-        faf = dff.groupby(TARGET_COL)["FAF"].mean().reset_index()
+        faf = dff.groupby(TARGET_COL, as_index=False)["FAF"].mean()
         fig = px.bar(faf, x=TARGET_COL, y="FAF", title="FAF (atividade física média) por nível")
+        fig = apply_dark_style(fig)
         st.plotly_chart(fig, use_container_width=True)
-
+    
     with c7:
-        tue = dff.groupby(TARGET_COL)["TUE"].mean().reset_index()
+        tue = dff.groupby(TARGET_COL, as_index=False)["TUE"].mean()
         fig = px.bar(tue, x=TARGET_COL, y="TUE", title="TUE (tempo tecnologia médio) por nível")
+        fig = apply_dark_style(fig)
         st.plotly_chart(fig, use_container_width=True)
-
-    st.divider()
+       
+        st.divider()
 
     # Importâncias do modelo (RandomForest)
     st.markdown("### Top variáveis do modelo (explicabilidade)")
@@ -484,7 +596,7 @@ else:
     st.markdown("""
 **Objetivo:** prever o *nível de obesidade* (7 classes) para apoiar a triagem clínica.
 
-**Modelo:** RandomForest com pipeline completo (tratamento de numéricas e categóricas) + feature engineering com **BMI (IMC)**.
+**Modelo:** RandomForest com pipeline completo (tratamento de numéricas e categóricas) + feature engineering com **(IMC)**.
 """)
 
     st.markdown("""
@@ -506,18 +618,10 @@ O modelo foi desenvolvido utilizando uma pipeline completa de Machine Learning, 
 - Tratamento de valores ausentes
 - Padronização de variáveis numéricas
 - Codificação de variáveis categóricas
-- Engenharia de atributos (BMI)
+- Engenharia de atributos com IMC
 - Classificador RandomForest
 
 ### Justificativa da Escolha do Modelo
 O RandomForest foi escolhido por sua robustez para dados tabulares, capacidade de capturar relações não lineares e bom desempenho em problemas multiclasse.
 
-### Validação
-- Validação cruzada (5-fold): 98,5% de acurácia média
-- Teste holdout: 97,6% de acurácia
-
-A baixa diferença entre validação e teste indica boa capacidade de generalização.
-
-### Considerações
-O sistema atua como apoio à decisão clínica e não substitui avaliação médica especializada.
 """)
